@@ -10,14 +10,17 @@ import StrandDesign
 /// Public entry used by Live / Workouts. Keeps the prior `onStart` + optional title overrides so the
 /// merge-name prompt can reuse the same browser.
 struct StartWorkoutSheet: View {
-    let onStart: (_ sport: String) -> Void
+    let onStart: (_ sport: String, _ gps: Bool) -> Void
+    private let allowGpsChoice: Bool
     private let heading: String
     private let explainer: String
     private let actionVerb: String
 
     init(title: String? = nil, subtitle: String? = nil, actionVerb: String? = nil,
-         onStart: @escaping (_ sport: String) -> Void) {
+         allowGpsChoice: Bool = true,
+         onStart: @escaping (_ sport: String, _ gps: Bool) -> Void) {
         self.onStart = onStart
+        self.allowGpsChoice = allowGpsChoice
         self.heading = title ?? String(localized: "Choose a workout")
         self.explainer = subtitle
             ?? String(localized: "Pick an activity to begin recording heart rate, effort, peak, and average.")
@@ -26,7 +29,7 @@ struct StartWorkoutSheet: View {
 
     var body: some View {
         WorkoutSelectionScreen(heading: heading, explainer: explainer, actionVerb: actionVerb,
-                               onStart: onStart)
+                               allowGpsChoice: allowGpsChoice, onStart: onStart)
     }
 }
 
@@ -36,10 +39,14 @@ struct WorkoutSelectionScreen: View {
     let heading: String
     let explainer: String
     let actionVerb: String
-    let onStart: (_ sport: String) -> Void
+    let allowGpsChoice: Bool
+    let onStart: (_ sport: String, _ gps: Bool) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
+    @State private var pendingSport = ""
+    @State private var gpsOn = false
+    @State private var showGpsOptions = false
     @FocusState private var searchFocused: Bool
 
     private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
@@ -101,6 +108,23 @@ struct WorkoutSelectionScreen: View {
                 }
             }
         }
+        .sheet(isPresented: $showGpsOptions) {
+            VStack(alignment: .leading, spacing: NoopMetrics.space5) {
+                Text(pendingSport).font(StrandFont.title2)
+                Toggle("Track GPS route", isOn: $gpsOn)
+                Text("GPS is recorded on this device only when location permission is granted.")
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textTertiary)
+                Button("Start") {
+                    RecentSportsPrefs.recordSelection(pendingSport)
+                    onStart(pendingSport, gpsOn)
+                    showGpsOptions = false
+                    dismiss()
+                }
+            }
+            .padding(NoopMetrics.space5)
+            .frame(minWidth: 320)
+        }
         #if os(macOS)
         .frame(minWidth: 480, minHeight: 640)
         #endif
@@ -155,9 +179,15 @@ struct WorkoutSelectionScreen: View {
 
     private func select(_ name: String) {
         searchFocused = false
-        RecentSportsPrefs.recordSelection(name)
-        onStart(name)
-        dismiss()
+        if allowGpsChoice {
+            pendingSport = name
+            gpsOn = WorkoutCatalog.sport(named: name)?.isDistanceSport ?? false
+            showGpsOptions = true
+        } else {
+            RecentSportsPrefs.recordSelection(name)
+            onStart(name, false)
+            dismiss()
+        }
     }
 }
 
@@ -394,7 +424,7 @@ private extension ToolbarItemPlacement {
 
 #if DEBUG
 #Preview("Choose a workout") {
-    StartWorkoutSheet { _ in }
+    StartWorkoutSheet { _, _ in }
         .preferredColorScheme(.dark)
 }
 #endif

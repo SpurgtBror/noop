@@ -2821,4 +2821,8 @@
     <string name="raw_diag_ecg_probe_start">开始心电图采集</string>
     <string name="raw_diag_ecg_probe_stop">停止心电图采集</string>
     <string name="raw_diag_ecg_probe_running">此腕带上可能仍在采集。结论会写入 strap log。</string>
+    <string name="workout_distance_splits">距离分段</string>
+    <string name="workout_route_markers">路线上标有起点和终点。</string>
+    <string name="workout_split_time_rate">%1$s · %2$s</string>
+    <string name="workout_partial_distance">不足一段 · %1$s</string>
 </resources>

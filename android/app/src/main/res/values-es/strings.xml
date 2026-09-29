@@ -2851,4 +2851,8 @@
     <string name="raw_diag_ecg_probe_start">Iniciar captura de ECG</string>
     <string name="raw_diag_ecg_probe_stop">Detener captura de ECG</string>
     <string name="raw_diag_ecg_probe_running">Puede que siga activa una captura en esta correa. El veredicto se registra en el strap log.</string>
+    <string name="workout_distance_splits">Tramos de distancia</string>
+    <string name="workout_route_markers">El inicio y el final están marcados en la ruta.</string>
+    <string name="workout_split_time_rate">%1$s · %2$s</string>
+    <string name="workout_partial_distance">Parcial · %1$s</string>
 </resources>

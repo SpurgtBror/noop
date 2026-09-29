@@ -12,15 +12,19 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.noop.analytics.RouteMath
+import com.noop.analytics.TimedWorkoutPoint
 
 /** Draws a GPS route as a polyline on a blank canvas — no map tiles, fully offline. */
 @Composable
-fun RouteCanvas(polyline: String, modifier: Modifier = Modifier) {
+fun RouteCanvas(polyline: String, modifier: Modifier = Modifier, timed: List<TimedWorkoutPoint> = emptyList()) {
     // PERF (#scroll-jank): the polyline decode ran every recomposition and the normalize + Path build ran
     // every frame. remember() the decode (keyed on the polyline) and hoist the normalize + Path into
     // drawWithCache (keyed on the points + the implicit size) so they tessellate ONCE and replay on scroll.
     // Pixel-identical: same normalizeToBox geometry, same stroke + endpoint markers.
-    val points = remember(polyline) { RouteMath.decode(polyline) }
+    val points = remember(polyline, timed) {
+        if (timed.size >= 2) timed.map { RouteMath.LatLng(it.latE6 / 1e6, it.lonE6 / 1e6) }
+        else RouteMath.decode(polyline)
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -32,7 +36,11 @@ fun RouteCanvas(polyline: String, modifier: Modifier = Modifier) {
                 } else {
                     val path = Path().apply {
                         moveTo(screen.first().first, screen.first().second)
-                        screen.drop(1).forEach { (x, y) -> lineTo(x, y) }
+                        screen.drop(1).forEachIndexed { index, (x, y) ->
+                            if (timed.size == screen.size && timed[index].segment != timed[index + 1].segment)
+                                moveTo(x, y)
+                            else lineTo(x, y)
+                        }
                     }
                     val stroke = Stroke(width = 6f)
                     val start = Offset(screen.first().first, screen.first().second)
