@@ -2821,7 +2821,11 @@
     <string name="raw_diag_ecg_probe_start">开始心电图采集</string>
     <string name="raw_diag_ecg_probe_stop">停止心电图采集</string>
     <string name="raw_diag_ecg_probe_running">此腕带上可能仍在采集。结论会写入 strap log。</string>
+    <string name="workout_show_street_map">显示街道地图</string>
+    <string name="workout_hide_street_map">隐藏街道地图</string>
     <string name="workout_distance_splits">距离分段</string>
+    <string name="workout_street_privacy">仅在点按“显示街道地图”后才加载地图。查看区域会发送给 OpenStreetMap。</string>
+    <string name="workout_osm_attribution">© OpenStreetMap 贡献者</string>
     <string name="workout_route_markers">路线上标有起点和终点。</string>
     <string name="workout_split_time_rate">%1$s · %2$s</string>
     <string name="workout_partial_distance">不足一段 · %1$s</string>

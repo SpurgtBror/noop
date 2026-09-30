@@ -1472,6 +1472,7 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
     var timedRoute by remember(row.deviceId, row.startTs, row.sport) {
         mutableStateOf<List<com.noop.analytics.TimedWorkoutPoint>>(emptyList())
     }
+    var showStreetMap by remember(row.deviceId, row.startTs, row.sport) { mutableStateOf(false) }
     // Steps for an on-foot sport (#398): the strap's own counter over the window, computed at display time
     // so it "fills in after sync". null for non-foot sports or when no strap counter covers the window.
     var steps by remember(row.startTs) { mutableStateOf<Int?>(null) }
@@ -1542,7 +1543,14 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
                 if (remember(poly) { RouteMath.decode(poly).size >= 2 }) {
                     CardDivider()
                     Overline("Route")
-                    RouteCanvas(poly, timed = timedRoute)
+                    if (showStreetMap) StreetRouteMap(poly, timedRoute)
+                    else RouteCanvas(poly, timed = timedRoute)
+                    TextButton(onClick = { showStreetMap = !showStreetMap }) {
+                        Text(stringResource(if (showStreetMap) R.string.workout_hide_street_map else R.string.workout_show_street_map))
+                    }
+                    if (!showStreetMap) Text(stringResource(R.string.workout_street_privacy),
+                        style = NoopType.footnote, color = Palette.textTertiary)
+                    else Text(stringResource(R.string.workout_osm_attribution), style = NoopType.footnote, color = Palette.textTertiary)
                     Text(stringResource(R.string.workout_route_markers),
                         style = NoopType.footnote, color = Palette.textTertiary)
                 }
