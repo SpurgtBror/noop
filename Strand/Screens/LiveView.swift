@@ -179,7 +179,7 @@ struct LiveView: View {
         // Pick a named sport before starting (#519) — the live workout view then opens
         // off the activeWorkout change above, so no extra navigation is needed here.
         .workoutSelectionCover(isPresented: $showStartSport) {
-            StartWorkoutSheet { name in model.startWorkout(sport: name) }
+            StartWorkoutSheet { name, gps in model.startWorkout(sport: name, gpsEnabled: gps) }
         }
         // Manual HRV snapshot (#127) — a still, seated 60s R-R reading.
         .sheet(isPresented: $showHRVSnapshot) {

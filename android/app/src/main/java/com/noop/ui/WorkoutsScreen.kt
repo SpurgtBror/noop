@@ -1469,6 +1469,9 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
     var zoneMinutes by remember(row.startTs) { mutableStateOf<List<Double>?>(null) }
     var zonesFromImport by remember(row.startTs) { mutableStateOf(false) }
     var heartRateRecovery by remember(row.startTs) { mutableStateOf<HeartRateRecovery.Result?>(null) }
+    var timedRoute by remember(row.deviceId, row.startTs, row.sport) {
+        mutableStateOf<List<com.noop.analytics.TimedWorkoutPoint>>(emptyList())
+    }
     // Steps for an on-foot sport (#398): the strap's own counter over the window, computed at display time
     // so it "fills in after sync". null for non-foot sports or when no strap counter covers the window.
     var steps by remember(row.startTs) { mutableStateOf<Int?>(null) }
@@ -1488,6 +1491,10 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
             zonesFromImport = false
         }
         heartRateRecovery = vm.workoutHeartRateRecovery(row.startTs, row.endTs, row.source, row.deviceId)
+        timedRoute = vm.repo.workoutRoutePoints(row).map { point ->
+            com.noop.analytics.TimedWorkoutPoint(point.latE6, point.lonE6, point.tMs,
+                point.activeElapsedMs, point.segment)
+        }
     }
 
     ModalBottomSheet(
@@ -1531,42 +1538,43 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
             steps?.let { DetailRow("Steps", "${grouped(it.toDouble())} steps") }  // #398, on-foot sports
             if (!row.notes.isNullOrBlank()) DetailRow("Notes", row.notes)
 
-            // Export the recorded GPS route as a GPX/FIT file (Strava / Garmin Connect / any GPS app).
-            // Only when a route with a drawable path was recorded; the file is built on-device and shared.
             row.routePolyline?.let { poly ->
-                val track = remember(poly) { RouteMath.decode(poly) }
-                if (track.size >= 2) {
-                    val exportCtx = LocalContext.current
-                    val exportScope = rememberCoroutineScope()
+                if (remember(poly) { RouteMath.decode(poly).size >= 2 }) {
                     CardDivider()
-                    Text("Export route", style = NoopType.subhead, color = Palette.textPrimary)
-                    Text(
-                        "Save this GPS route as a file to import into Strava, Garmin Connect, or another app. " +
-                            "Built on your phone — nothing is uploaded until you choose to share it.",
-                        style = NoopType.footnote,
-                        color = Palette.textTertiary,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        NoopButton(
-                            text = "GPX",
-                            kind = NoopButtonKind.Secondary,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                exportScope.launch {
-                                    RouteExportShare.share(exportCtx, RouteExport.Format.GPX, track, row)
-                                }
-                            },
-                        )
-                        NoopButton(
-                            text = "FIT",
-                            kind = NoopButtonKind.Secondary,
-                            modifier = Modifier.weight(1f),
-                            onClick = {
-                                exportScope.launch {
-                                    RouteExportShare.share(exportCtx, RouteExport.Format.FIT, track, row)
-                                }
-                            },
-                        )
+                    Overline("Route")
+                    RouteCanvas(poly, timed = timedRoute)
+                    Text(stringResource(R.string.workout_route_markers),
+                        style = NoopType.footnote, color = Palette.textTertiary)
+                }
+            }
+            if (timedRoute.size >= 2) {
+                val units = UnitPrefs.distanceSystem(LocalContext.current)
+                val unitMeters = if (units == UnitSystem.IMPERIAL)
+                    com.noop.analytics.WorkoutSplits.MILE_M else com.noop.analytics.WorkoutSplits.KILOMETER_M
+                val splits = remember(timedRoute, unitMeters) {
+                    com.noop.analytics.WorkoutSplits.calculate(timedRoute, unitMeters)
+                }
+                if (splits.isNotEmpty()) {
+                    CardDivider()
+                    Overline(stringResource(R.string.workout_distance_splits))
+                    val paceSport = WorkoutSport.isOnFoot(row.sport)
+                    splits.forEach { split ->
+                        val seconds = (split.durationMs / 1000.0).roundToInt()
+                        val duration = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
+                        val rate = if (paceSport) {
+                            UnitFormatter.paceFromSecPerKm(
+                                split.durationMs / 1000.0 / (split.distanceM / 1000.0), units)
+                        } else {
+                            UnitFormatter.speedFromKilometersPerHour(
+                                split.distanceM / split.durationMs * 3600.0, units) ?: "–"
+                        }
+                        val label = if (split.partial)
+                            stringResource(R.string.workout_partial_distance, UnitFormatter.distanceFromKilometers(split.distanceM / 1000.0, units))
+                        else "${split.number} ${UnitFormatter.distanceUnit(units)}"
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(label, style = NoopType.body, color = Palette.textPrimary)
+                            Text(stringResource(R.string.workout_split_time_rate, duration, rate), style = NoopType.body, color = Palette.textSecondary)
+                        }
                     }
                 }
             }
@@ -1650,6 +1658,47 @@ internal fun WorkoutDetailSheet(vm: AppViewModel, row: WorkoutRow, onDismiss: ()
                 CardDivider()
                 HeartRateRecoveryCard(it)
             }
+
+            // Export the recorded GPS route as a GPX/FIT file (Strava / Garmin Connect / any GPS app).
+            // Only when a route with a drawable path was recorded; the file is built on-device and shared.
+            row.routePolyline?.let { poly ->
+                val track = remember(poly) { RouteMath.decode(poly) }
+                if (track.size >= 2) {
+                    val exportCtx = LocalContext.current
+                    val exportScope = rememberCoroutineScope()
+                    CardDivider()
+                    Text("Export route", style = NoopType.subhead, color = Palette.textPrimary)
+                    Text(
+                        "Save this GPS route as a file to import into Strava, Garmin Connect, or another app. " +
+                            "Built on your phone — nothing is uploaded until you choose to share it.",
+                        style = NoopType.footnote,
+                        color = Palette.textTertiary,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        NoopButton(
+                            text = "GPX",
+                            kind = NoopButtonKind.Secondary,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                exportScope.launch {
+                                    RouteExportShare.share(exportCtx, RouteExport.Format.GPX, track, row)
+                                }
+                            },
+                        )
+                        NoopButton(
+                            text = "FIT",
+                            kind = NoopButtonKind.Secondary,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                exportScope.launch {
+                                    RouteExportShare.share(exportCtx, RouteExport.Format.FIT, track, row)
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
         }
     }
 }

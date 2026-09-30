@@ -41,8 +41,8 @@ struct WorkoutStartControl: View {
         // #519: name the sport before a live session starts, then open the in-exercise view directly
         // (same direct present as the button's already-active path — no cross-view auto-present race).
         .workoutSelectionCover(isPresented: $showStartSport) {
-            StartWorkoutSheet { name in
-                model.startWorkout(sport: name)
+            StartWorkoutSheet { name, gps in
+                model.startWorkout(sport: name, gpsEnabled: gps)
                 showLiveWorkout = true
             }
         }

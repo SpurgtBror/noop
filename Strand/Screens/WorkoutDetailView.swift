@@ -16,7 +16,7 @@ import MapKit
 //
 //   • a header (sport displayName · date · duration) with the source badge,
 //   • a 3-up StatTile strip (avg HR · max HR · calories / distance),
-//   • a GPS route map when the session recorded one on-device (#524) — a MapKit map of the captured
+//   • a GPS route view when the session recorded one on-device (#524) — an offline drawing of the captured
 //     polyline with start/end markers, shown only when points were actually captured,
 //   • an HR-curve ChartCard fed the workout's 5-min-ish HR buckets over [startTs, endTs],
 //   • an HR-zones bar — imported per-workout zones when the row carries them, else the window's raw
@@ -60,6 +60,7 @@ struct WorkoutDetailView: View {
     /// The GPS route captured for this session on-device (#524), if any. Decoded from `RouteStore` by the
     /// row's natural key. nil = no route was recorded (honest — the map only shows when points exist).
     @State private var route: [RouteMath.LatLng] = []
+    @State private var timedRoute: [TimedWorkoutPoint] = []
 
     /// Drives the GPX/FIT export chooser for the recorded route.
     @State private var showRouteExport = false
@@ -86,12 +87,14 @@ struct WorkoutDetailView: View {
             headerCard
             statStrip
             routeCard
+            splitsCard
             hrCurveCard
             zonesCard
             heartRateRecoveryCard
             if let strain = row.strain {
                 effortCard(strain: strain)
             }
+            routeExportCard
         }
         .toolbar {
             // A Done affordance for the sheet on both platforms (iOS gets the grabber too).
@@ -113,6 +116,30 @@ struct WorkoutDetailView: View {
             let pts = RouteMath.decode(r.polyline)
             return pts.count >= 2 ? pts : []
         }()
+
+        // New routes live in the shared DB. Older Apple captures retain their original point times in
+        // RouteStore; copy those on first detail read so they can gain splits without guessing times.
+        let routeDeviceId = row.source == "apple-health" || row.source == "activity-file"
+            ? row.source : repo.deviceId
+        if let store = await repo.storeHandle() {
+            var stored = (try? await store.workoutRoutePoints(deviceId: routeDeviceId,
+                startTs: row.startTs, sport: row.sport)) ?? []
+            if stored.isEmpty,
+               let legacy = RouteStore.loadWithPoints(startTs: row.startTs, sport: row.sport)?.points,
+               legacy.count >= 2 {
+                stored = legacy.map { point in
+                    StoredWorkoutRoutePoint(latE6: Int(floor(point.lat * 1_000_000 + 0.5)),
+                        lonE6: Int(floor(point.lon * 1_000_000 + 0.5)), tMs: point.tMs,
+                        activeElapsedMs: point.activeElapsedMs, segment: point.segment ?? 0)
+                }
+                try? await store.replaceWorkoutRoutePoints(stored, deviceId: routeDeviceId,
+                    startTs: row.startTs, sport: row.sport)
+            }
+            timedRoute = stored.map { point in
+                TimedWorkoutPoint(latE6: point.latE6, lonE6: point.lonE6, tMs: point.tMs,
+                    activeElapsedMs: point.activeElapsedMs, segment: point.segment)
+            }
+        }
 
         // HR curve over the exact session window — a finer bucket than the 24h chart so a short run
         // still reads as a curve, not a handful of points.
@@ -279,7 +306,7 @@ struct WorkoutDetailView: View {
 
     // MARK: - GPS route (#524)
 
-    /// The captured-route card: a MapKit map of the polyline with start/end markers, plus distance and
+    /// The captured-route card: an offline drawing with start/end markers, plus distance and
     /// pace read off the route. Shown ONLY when ≥2 points were captured — honest "no map" otherwise (a
     /// Mac with no GPS, denied permission, or a non-distance sport never produce a route).
     @ViewBuilder private var routeCard: some View {
@@ -289,11 +316,11 @@ struct WorkoutDetailView: View {
                               trailing: distanceLabel(row.distanceM))
                 NoopCard(padding: 0, tint: StrandPalette.effortColor) {
                     VStack(alignment: .leading, spacing: 0) {
-                        WorkoutRouteMap(points: route)
-                            .frame(height: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: NoopMetrics.cardRadius,
-                                                        style: .continuous))
-                            .accessibilityLabel(routeAccessibilityLabel)
+                        OfflineWorkoutRouteMap(points: route, timed: timedRoute)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: NoopMetrics.cardRadius,
+                                                    style: .continuous))
+                        .accessibilityLabel(routeAccessibilityLabel)
                         HStack(spacing: 0) {
                             routeStat(String(localized: "Distance"), distanceLabel(row.distanceM),
                                       tint: StrandPalette.metricCyan)
@@ -308,6 +335,14 @@ struct WorkoutDetailView: View {
                     .foregroundStyle(StrandPalette.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
 
+            }
+        }
+    }
+
+    @ViewBuilder private var routeExportCard: some View {
+        if route.count >= 2 {
+            VStack(alignment: .leading, spacing: NoopMetrics.gap) {
+                SectionHeader("Export route")
                 Button {
                     showRouteExport = true
                 } label: {
@@ -399,6 +434,44 @@ struct WorkoutDetailView: View {
             return String(localized: "This stays on your device. It is never uploaded, never synced, never shared.")
         case .detected, .manual:
             return String(localized: "Your GPS route for this session, recorded and stored on your device. Nothing leaves your phone.")
+        }
+    }
+
+    // MARK: - Distance splits
+
+    @ViewBuilder private var splitsCard: some View {
+        let unitMeters = distanceUnitSystem == .imperial ? WorkoutSplits.mileM : WorkoutSplits.kilometerM
+        let splits = WorkoutSplits.calculate(timedRoute, unitMeters: unitMeters)
+        if !splits.isEmpty {
+            VStack(alignment: .leading, spacing: NoopMetrics.gap) {
+                SectionHeader("Distance splits")
+                let paceSport = WorkoutCatalog.isOnFoot(row.sport)
+                ForEach(splits, id: \.number) { split in
+                    HStack {
+                        if split.partial {
+                            HStack(spacing: 4) {
+                                Text("Partial")
+                                Text("·")
+                                Text(UnitFormatter.distanceFromKilometers(split.distanceM / 1000,
+                                                                          system: distanceUnitSystem))
+                            }
+                        } else {
+                            Text("\(split.number) \(UnitFormatter.distanceUnit(distanceUnitSystem))")
+                        }
+                        Spacer()
+                        let seconds = Int((Double(split.durationMs) / 1000).rounded())
+                        let duration = "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+                        let rate = paceSport
+                            ? UnitFormatter.paceFromSecPerKm(Double(split.durationMs) / split.distanceM,
+                                                              system: distanceUnitSystem)
+                            : (UnitFormatter.speedFromKilometersPerHour(split.distanceM /
+                                Double(split.durationMs) * 3600, system: distanceUnitSystem) ?? "—")
+                        Text("\(duration) · \(rate)")
+                            .foregroundStyle(StrandPalette.textSecondary)
+                    }
+                    .font(StrandFont.body)
+                }
+            }
         }
     }
 
@@ -635,6 +708,47 @@ struct WorkoutDetailView: View {
     private static let intFmt: NumberFormatter = {
         let f = NumberFormatter(); f.numberStyle = .decimal; f.maximumFractionDigits = 0; return f
     }()
+}
+
+/// Route geometry remains visible without loading any street tiles.
+struct OfflineWorkoutRouteMap: View {
+    let points: [RouteMath.LatLng]
+    let timed: [TimedWorkoutPoint]
+
+    var body: some View {
+        Canvas { context, size in
+            guard points.count >= 2 else { return }
+            let minLat = points.map(\.lat).min() ?? 0
+            let maxLat = points.map(\.lat).max() ?? 0
+            let minLon = points.map(\.lon).min() ?? 0
+            let maxLon = points.map(\.lon).max() ?? 0
+            let width = max(maxLon - minLon, 0.00001)
+            let height = max(maxLat - minLat, 0.00001)
+            let padding: CGFloat = 20
+            func position(_ point: RouteMath.LatLng) -> CGPoint {
+                CGPoint(x: padding + CGFloat((point.lon - minLon) / width) * (size.width - padding * 2),
+                        y: padding + CGFloat((maxLat - point.lat) / height) * (size.height - padding * 2))
+            }
+            var path = Path()
+            path.move(to: position(points[0]))
+            for index in points.indices.dropFirst() {
+                let point = position(points[index])
+                if timed.count == points.count && timed[index].segment != timed[index - 1].segment {
+                    path.move(to: point)
+                } else {
+                    path.addLine(to: point)
+                }
+            }
+            context.stroke(path, with: .color(StrandPalette.effortColor), lineWidth: 4)
+            let start = position(points[0])
+            let finish = position(points[points.count - 1])
+            context.fill(Path(ellipseIn: CGRect(x: start.x - 5, y: start.y - 5, width: 10, height: 10)),
+                         with: .color(StrandPalette.metricCyan))
+            context.fill(Path(ellipseIn: CGRect(x: finish.x - 5, y: finish.y - 5, width: 10, height: 10)),
+                         with: .color(StrandPalette.effortColor))
+        }
+        .background(StrandPalette.surfaceBase)
+    }
 }
 
 // MARK: - Route map (#524)
