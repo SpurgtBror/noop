@@ -286,6 +286,7 @@ dependencies {
 
     // --- AI Coach (opt-in, bring-your-own-key). HTTP client + Keystore-backed key storage. ---
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.maplibre.gl:android-sdk:11.13.1")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // --- Health Connect (optional native Android import of steps/HR/HRV/sleep/etc.) ---

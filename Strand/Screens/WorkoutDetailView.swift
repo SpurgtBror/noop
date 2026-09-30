@@ -64,6 +64,7 @@ struct WorkoutDetailView: View {
 
     /// Drives the GPX/FIT export chooser for the recorded route.
     @State private var showRouteExport = false
+    @State private var showStreetMap = false
 
     /// Steps over the session window for an on-foot sport (#398): the count plus whether it came from the
     /// strap's own counter (MG/5.0) or the phone pedometer (fallback for WHOOP 4.0 / not-yet-synced / CSV
@@ -306,7 +307,7 @@ struct WorkoutDetailView: View {
 
     // MARK: - GPS route (#524)
 
-    /// The captured-route card: an offline drawing with start/end markers, plus distance and
+    /// The captured-route card: an offline drawing with an optional MapKit layer, plus distance and
     /// pace read off the route. Shown ONLY when ≥2 points were captured — honest "no map" otherwise (a
     /// Mac with no GPS, denied permission, or a non-distance sport never produce a route).
     @ViewBuilder private var routeCard: some View {
@@ -316,7 +317,10 @@ struct WorkoutDetailView: View {
                               trailing: distanceLabel(row.distanceM))
                 NoopCard(padding: 0, tint: StrandPalette.effortColor) {
                     VStack(alignment: .leading, spacing: 0) {
-                        OfflineWorkoutRouteMap(points: route, timed: timedRoute)
+                        Group {
+                            if showStreetMap { WorkoutRouteMap(points: route, timed: timedRoute) }
+                            else { OfflineWorkoutRouteMap(points: route, timed: timedRoute) }
+                        }
                         .frame(height: 220)
                         .clipShape(RoundedRectangle(cornerRadius: NoopMetrics.cardRadius,
                                                     style: .continuous))
@@ -334,6 +338,13 @@ struct WorkoutDetailView: View {
                     .font(StrandFont.footnote)
                     .foregroundStyle(StrandPalette.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
+                Button(showStreetMap ? "Hide street map" : "Show street map") {
+                    showStreetMap.toggle()
+                }
+                .buttonStyle(NoopButtonStyle(.secondary, fullWidth: true))
+                Text("Street tiles load from the map provider only when you choose to show them. The viewed area is sent to that provider.")
+                    .font(StrandFont.footnote)
+                    .foregroundStyle(StrandPalette.textTertiary)
 
             }
         }
@@ -770,6 +781,7 @@ typealias RouteMapRepresentable = NSViewRepresentable
 #if canImport(MapKit)
 struct WorkoutRouteMap: RouteMapRepresentable {
     let points: [RouteMath.LatLng]
+    let timed: [TimedWorkoutPoint]
 
     private var coordinates: [CLLocationCoordinate2D] {
         points.map { CLLocationCoordinate2D(latitude: $0.lat, longitude: $0.lon) }
@@ -795,7 +807,17 @@ struct WorkoutRouteMap: RouteMapRepresentable {
         let coords = coordinates
         guard coords.count >= 2 else { return }
         let line = MKPolyline(coordinates: coords, count: coords.count)
-        map.addOverlay(line)
+        var start = 0
+        for index in 1...coords.count {
+            if index == coords.count || (timed.count == coords.count &&
+                timed[index].segment != timed[index - 1].segment) {
+                if index - start >= 2 {
+                    let slice = Array(coords[start..<index])
+                    map.addOverlay(MKPolyline(coordinates: slice, count: slice.count))
+                }
+                start = index
+            }
+        }
 
         let start = MKPointAnnotation(); start.coordinate = coords.first!; start.title = String(localized: "Start")
         let end = MKPointAnnotation(); end.coordinate = coords.last!; end.title = String(localized: "Finish")
@@ -845,6 +867,7 @@ private enum RoutePlatformColor {
 /// Platforms without MapKit (none we ship, but keeps the type resolvable): no route map.
 struct WorkoutRouteMap: View {
     let points: [RouteMath.LatLng]
+    let timed: [TimedWorkoutPoint]
     var body: some View { Color.clear }
 }
 #endif

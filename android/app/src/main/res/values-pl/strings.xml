@@ -2867,7 +2867,11 @@
     <string name="raw_diag_ecg_probe_start">Rozpocznij zapis EKG</string>
     <string name="raw_diag_ecg_probe_stop">Zatrzymaj zapis EKG</string>
     <string name="raw_diag_ecg_probe_running">Na tym pasku może nadal trwać zapis. Werdykt trafia do strap log.</string>
+    <string name="workout_show_street_map">Pokaż mapę ulic</string>
+    <string name="workout_hide_street_map">Ukryj mapę ulic</string>
     <string name="workout_distance_splits">Odcinki dystansu</string>
+    <string name="workout_street_privacy">Mapa ładuje się dopiero po naciśnięciu „Pokaż mapę ulic”. Wyświetlany obszar jest wysyłany do OpenStreetMap.</string>
+    <string name="workout_osm_attribution">© Współtwórcy OpenStreetMap</string>
     <string name="workout_route_markers">Początek i koniec są oznaczone na trasie.</string>
     <string name="workout_split_time_rate">%1$s · %2$s</string>
     <string name="workout_partial_distance">Odcinek częściowy · %1$s</string>

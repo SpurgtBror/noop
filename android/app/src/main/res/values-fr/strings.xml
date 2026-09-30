@@ -2850,7 +2850,11 @@
     <string name="raw_diag_ecg_probe_start">Démarrer la capture ECG</string>
     <string name="raw_diag_ecg_probe_stop">Arrêter la capture ECG</string>
     <string name="raw_diag_ecg_probe_running">Une capture est peut-être encore active sur ce bracelet. Le verdict est écrit dans le strap log.</string>
+    <string name="workout_show_street_map">Afficher la carte des rues</string>
+    <string name="workout_hide_street_map">Masquer la carte des rues</string>
     <string name="workout_distance_splits">Segments de distance</string>
+    <string name="workout_street_privacy">Les tuiles chargent seulement après avoir touché « Afficher la carte des rues ». La zone visible est envoyée à OpenStreetMap.</string>
+    <string name="workout_osm_attribution">© Contributeurs OpenStreetMap</string>
     <string name="workout_route_markers">Le départ et l’arrivée sont indiqués sur le parcours.</string>
     <string name="workout_split_time_rate">%1$s · %2$s</string>
     <string name="workout_partial_distance">Partiel · %1$s</string>

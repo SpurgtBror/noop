@@ -2864,7 +2864,11 @@
     <string name="raw_diag_ecg_probe_start">EKG-Aufzeichnung starten</string>
     <string name="raw_diag_ecg_probe_stop">EKG-Aufzeichnung stoppen</string>
     <string name="raw_diag_ecg_probe_running">Auf diesem Strap läuft möglicherweise noch eine Aufzeichnung. Das Ergebnis steht im Strap-Log.</string>
+    <string name="workout_show_street_map">Straßenkarte anzeigen</string>
+    <string name="workout_hide_street_map">Straßenkarte ausblenden</string>
     <string name="workout_distance_splits">Distanzabschnitte</string>
+    <string name="workout_street_privacy">Straßenkarten werden erst nach Tippen auf „Straßenkarte anzeigen“ geladen. Der angezeigte Bereich wird an OpenStreetMap gesendet.</string>
+    <string name="workout_osm_attribution">© OpenStreetMap-Mitwirkende</string>
     <string name="workout_route_markers">Start und Ziel sind auf der Route markiert.</string>
     <string name="workout_split_time_rate">%1$s · %2$s</string>
     <string name="workout_partial_distance">Teilabschnitt · %1$s</string>

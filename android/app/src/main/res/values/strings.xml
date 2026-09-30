@@ -2880,7 +2880,11 @@
     <string name="raw_diag_ecg_probe_start">Start ECG capture</string>
     <string name="raw_diag_ecg_probe_stop">Stop ECG capture</string>
     <string name="raw_diag_ecg_probe_running">A capture may still be running on this strap. The verdict goes to the strap log.</string>
+    <string name="workout_show_street_map">Show street map</string>
+    <string name="workout_hide_street_map">Hide street map</string>
     <string name="workout_distance_splits">Distance splits</string>
+    <string name="workout_street_privacy">Street tiles load only when you tap Show street map. Your viewed area is sent to OpenStreetMap.</string>
+    <string name="workout_osm_attribution">© OpenStreetMap contributors</string>
     <string name="workout_route_markers">Start and finish are marked on the route.</string>
     <string name="workout_split_time_rate">%1$s · %2$s</string>
     <string name="workout_partial_distance">Partial · %1$s</string>
